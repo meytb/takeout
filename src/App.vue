@@ -405,14 +405,33 @@ const scrollToCategory = (index: number) => {
 }
 const clearCart = () => {
   // 遍历所有商品，将数量设置为0
-    list.value.forEach(category => {
-      category.val.forEach(item => {
-        item.num = 0
-      })
+  list.value.forEach(category => {
+    category.val.forEach(item => {
+      item.num = 0
     })
-    // 清空后自动关闭弹窗
-    show.value = false
-}
+  })
+  // 清空后自动关闭弹窗
+  show.value = false
+}// 添加搜索关键字响应式数据
+const searchKeyword = ref('')
+
+// 添加计算属性用于过滤商品
+const filteredList = computed(() => {
+  if (!searchKeyword.value.trim()) {
+    return list.value
+  }
+
+  const keyword = searchKeyword.value.trim().toLowerCase()
+  return list.value.map(category => {
+    const filteredItems = category.val.filter(item =>
+      item.name.toLowerCase().includes(keyword)
+    )
+    return {
+      ...category,
+      val: filteredItems
+    }
+  }).filter(category => category.val.length > 0)
+})
 </script>
 
 <template>
@@ -427,18 +446,26 @@ const clearCart = () => {
     <div class="content">
       <van-tabs v-model:active="active">
         <van-tab title="点菜">
+          <!-- 添加搜索框 -->
+          <div class="search-container">
+            <van-search v-model="searchKeyword" placeholder="请输入商品名称" shape="round" background="transparent"
+              @clear="searchKeyword = ''" />
+          </div>
+
           <div class="sidebar-title">
             <!-- 为 van-sidebar 添加类名以便设置样式 -->
-            <van-sidebar v-model="titleActve" class="custom-sidebar" @change="handleSidebarChange">
-              <van-sidebar-item v-for="(category, index) in list" :key="index" :title="category.type"
+            <van-sidebar v-model="titleActve" class="custom-sidebar" @change="handleSidebarChange"
+              v-show="!searchKeyword.trim()">
+              <van-sidebar-item v-for="(category, index) in filteredList" :key="index" :title="category.type"
                 :dot="index === 0" />
             </van-sidebar>
+
             <!-- 修改内容区域结构，显示所有分类内容 -->
             <div class="sidebar-content-wrapper" ref="sidebarContentWrapper">
               <div class="sidebar-content">
                 <!-- 显示所有分类的内容 -->
-                <div class="sidebar-content-item" v-for="(val, index) in list" :key="index"
-                  :ref="(el) => { if (el) categoryRefs[index] = el as HTMLElement }">
+                <div class="sidebar-content-item" v-for="(val, index) in filteredList" :key="index"
+                  :ref="(el) => { if (el && !searchKeyword.trim()) categoryRefs[index] = el as HTMLElement }">
                   <h5>{{ val.type }}</h5>
                   <div class="sidebar-items-container">
                     <div class="sidebar-item" v-for="(item, idx) in val.val" :key="idx">
@@ -452,8 +479,9 @@ const clearCart = () => {
                             </div>
 
                             <!-- 修复逻辑：仅根据 item.num 判断显示哪个组件 -->
-                            <van-icon v-if="item.num === 0" @click="add(index, idx)" name="add" color="#1989fa"
-                              size="25" />
+                            <van-icon v-if="item.num === 0"
+                              @click="add(filteredList.findIndex(c => c.val.includes(item)), idx)" name="add"
+                              color="#1989fa" size="25" />
                             <van-stepper v-else v-model="item.num" min="0" theme="round" button-size="22"
                               disable-input />
                           </div>
@@ -461,6 +489,11 @@ const clearCart = () => {
                       </van-card>
                     </div>
                   </div>
+                </div>
+
+                <!-- 搜索结果为空时的提示 -->
+                <div v-if="searchKeyword.trim() && filteredList.length === 0" class="no-results">
+                  <van-empty description="暂无相关商品" />
                 </div>
               </div>
             </div>
@@ -522,6 +555,90 @@ const clearCart = () => {
 </template>
 
 <style scoped>
+/* 搜索框容器样式 */
+.search-container {
+  padding: 10px 0;
+  background-color: #fff;
+}
+
+/* 无搜索结果提示样式 */
+.no-results {
+  text-align: center;
+  padding: 50px 0;
+}
+
+/* 搜索模式下隐藏侧边栏 */
+.sidebar-title {
+  display: flex;
+}
+
+/* 搜索模式下的内容样式调整 */
+.sidebar-content-wrapper {
+  flex: 1;
+  max-height: 592px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE 10+ */
+}
+
+.sidebar-content-wrapper::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.sidebar-content {
+  width: 100%;
+}
+
+/* 为侧边栏添加滚动样式 */
+.custom-sidebar {
+  max-height: 592px;
+  overflow-y: auto;
+  width: 81px;
+  flex-shrink: 0;
+  margin-right: 20px;
+  scrollbar-width: none;
+}
+
+/* 隐藏 Webkit 浏览器的滚动条 */
+.custom-sidebar::-webkit-scrollbar {
+  width: 0px;
+  background: transparent;
+}
+
+.sidebar-items-container {
+  max-height: 610px;
+  overflow-y: auto;
+  /* 隐藏滚动条但保持滚动功能 */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE 10+ */
+}
+
+.sidebar-items-container::-webkit-scrollbar {
+  width: 0px;
+  /* Chrome, Safari, Opera */
+  background: transparent;
+}
+
+.sidebar-item {
+  margin-bottom: 12px;
+}
+
+.card-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between
+}
+
+.tag {
+  font-size: 10px;
+}
+
 .container {
   padding: 12px;
   width: 100%;
